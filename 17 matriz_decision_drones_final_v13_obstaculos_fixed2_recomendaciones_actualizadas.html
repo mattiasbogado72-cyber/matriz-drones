@@ -1,0 +1,568 @@
+
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Matriz de decisión - v26 (Recomendaciones actualizadas)</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; padding: 24px; background:#f7f9fc; color:#111; position:relative; }
+  h1 { margin: 0 0 12px; }
+  .tabs { display:flex; gap:6px; margin-bottom:12px; }
+  .tab { flex:1; padding:10px; text-align:center; background:#e0e0e0; cursor:pointer; border-radius:6px 6px 0 0; user-select:none; }
+  .tab.active { background:#fff; font-weight:700; border-bottom:2px solid #4CAF50; }
+  .panel { display:none; background:#fff; padding:16px; border:1px solid #ddd; border-radius:0 6px 6px 6px; }
+  .panel.active { display:block; }
+  fieldset { border:none; margin:0; padding:0; }
+  label { display:block; margin:10px 0 4px; font-weight:600; }
+  input, select, textarea { width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box; }
+  .btn { padding:8px 12px; margin-top:12px; border:none; border-radius:4px; cursor:pointer; font-weight:600; }
+  .next { background:#4CAF50; color:#fff; }
+  .back { background:#9e9e9e; color:#fff; }
+  .result { font-size:1.05rem; font-weight:800; padding:8px 12px; border-radius:6px; display:inline-block; margin-top:8px; }
+  .apto { background:#C6EFCE; color:#064E2A; }
+  .cond { background:#FFEB9C; color:#5B3F00; }
+  .noap { background:#FFC7CE; color:#6B0000; }
+  .obs-legend { margin-bottom:10px; }
+  .badge { display:inline-block; padding:4px 8px; border-radius:6px; font-weight:700; margin-right:8px; }
+  .badge.apto { background:#C6EFCE; color:#0b6623; }
+  .badge.cond { background:#FFEB9C; color:#8a5600; }
+  .badge.noap { background:#FFC7CE; color:#8a0b0b; }
+  .obs-list { list-style:none; padding-left:0; margin-top:6px; }
+  .obs-list li { padding:8px; border-radius:6px; margin-bottom:6px; border:1px solid #eee; }
+  .obs-list li.apto { background:#f6fff7; }
+  .obs-list li.cond { background:#fffaf0; }
+  .obs-list li.noap { background:#fff6f6; }
+  .obs-title { font-weight:800; margin-bottom:6px; display:block; }
+  .obs-detail { margin-top:6px; font-size:0.95rem; color:#333; }
+  .obs-reco { margin-top:6px; font-size:0.95rem; color:#004085; background:#e8f4ff; padding:6px 8px; border-radius:4px; }
+  .obs-datos { margin-bottom:12px; padding:8px; background:#f0f8ff; border-radius:6px; border:1px solid #cce5ff; }
+  .obs-datos p { margin:2px 0; font-size:0.95rem; }
+  .summary { margin-top:8px; font-size:0.95rem; color:#444; }
+  #resetBtn { position:fixed; right:18px; top:18px; z-index:9999; background:#ff8c00; color:#fff; border-radius:6px; padding:8px 12px; font-weight:700; border:none; cursor:pointer; }
+  footer { margin-top:18px; color:#666; }
+  .export-note { font-size:0.9rem; color:#444; margin-top:10px; }
+  table.summary-table { width:100%; border-collapse:collapse; margin-bottom:12px; }
+  table.summary-table th, table.summary-table td { padding:6px; border:1px solid #ddd; text-align:left; vertical-align:top; }
+  @media (max-width:640px){ .tabs{flex-direction:column;} #resetBtn{position:static;margin-top:12px;} }
+</style>
+
+<!-- html2canvas + jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<h1>Matriz de decisión para aplicaciones con drones</h1>
+<button id="resetBtn" title="Reiniciar evaluación" onclick="resetForm()">Reiniciar evaluación</button>
+
+<div class="tabs" role="tablist" aria-label="Pestañas de la matriz">
+  <div class="tab active" onclick="showTab(0)" role="tab">1. Previo al Mapeo</div>
+  <div class="tab" onclick="showTab(1)" role="tab">2. Mapeo y Campo</div>
+  <div class="tab" onclick="showTab(2)" role="tab">3. Previo a la Aplicación (Ambiental)</div>
+  <div class="tab" onclick="showTab(3)" role="tab">4. Observaciones</div>
+</div>
+
+<!-- Pestaña 1 -->
+<div class="panel active" id="panel0" role="tabpanel">
+  <fieldset>
+    <label>Lote / Productor <input type="text" id="p_lote" placeholder="Nombre del lote o productor"></label>
+    <label>Fecha (dd/mm/aa) <input type="text" id="p_fecha" placeholder="dd/mm/aa"></label>
+    <label>Ubicación (Coordenadas) <input type="text" id="p_ubic" placeholder="-26.397, -54.635"></label>
+    <label>Sup/ha <input type="number" id="p_sup" step="0.01" placeholder="hectáreas"></label>
+    <label>Pendiente (%)<input type="number" id="p_pend" step="0.1"></label>
+    <label>Prox. aeródromos (m)<input type="number" id="p_aero"></label>
+    <label>Prox. viviendas/escuelas (m)<input type="number" id="p_viv"></label>
+    <label>Prox. cuerpos de agua (m)<input type="number" id="p_agua"></label>
+    <label>Disponibilidad logística (m)<input type="number" id="p_log"></label>
+    <label>Índice kp<input type="number" id="p_kp" step="0.1"></label>
+    <label>Accesibilidad<select id="p_acc"><option value="">—</option><option value="directo">Acceso directo</option><option value="parcial">Acceso parcial</option><option value="sin">Sin acceso</option></select></label>
+    <label>Áreas protegidas<select id="p_ap"><option value="">—</option><option value="ausente">Ausentes</option><option value="limite">Límite ≥ 200 m</option><option value="dentro">Dentro del área</option></select></label>
+  </fieldset>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button class="btn next" onclick="nextTab()">Siguiente</button>
+    <button class="btn back" onclick="resetForm()">Reiniciar evaluación</button>
+  </div>
+  <div id="status0" class="summary">Previo al Mapeo: —</div>
+</div>
+
+<!-- Pestaña 2 -->
+<div class="panel" id="panel1" role="tabpanel">
+  <fieldset>
+    <label>Pendiente (%)<input type="number" id="m_pend" step="0.1"></label>
+    <label>Accesibilidad<select id="m_acc"><option value="">—</option><option value="directo">Acceso directo</option><option value="parcial">Acceso parcial</option><option value="sin">Sin acceso</option></select></label>
+    <label>Prox. viviendas/escuelas (m)<input type="number" id="m_viv"></label>
+    <label>Prox. cuerpos de agua (m)<input type="number" id="m_agua"></label>
+    <label>Disponibilidad logística (m)<input type="number" id="m_log"></label>
+    <label>Obstáculos (desc)<select id="m_obsdesc"><option value="">—</option><option value="ausentes">Ausentes</option><option value="moderados">Moderados, requieren planificación de altura</option><option value="densos">Densos, bloquean trayectoria</option></select></label>
+    <label>Cobertura de obstáculos (%)<input type="number" id="m_obs" step="0.1"></label>
+    <label>Distribución de obstáculos<select id="m_obsdist"><option value="">—</option><option value="extremos">Extremos/bordes</option><option value="centro">Centros</option><option value="toda">Toda el área</option></select></label>
+    <label>Cobertura GNSS<select id="m_gnss"><option value="">—</option><option value="fuerte">Fuerte y estable</option><option value="intermitente">Intermitente</option><option value="nula">Nula</option></select></label>
+    <label>Áreas protegidas<select id="m_ap"><option value="">—</option><option value="ausente">Ausentes</option><option value="limite">Límite ≥ 200 m</option><option value="dentro">Dentro del área</option></select></label>
+  </fieldset>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button class="btn back" onclick="prevTab()">Volver</button>
+    <button class="btn next" onclick="nextTab()">Siguiente</button>
+    <button class="btn back" onclick="resetForm()">Reiniciar evaluación</button>
+  </div>
+  <div id="status1" class="summary">Mapeo y Campo: —</div>
+</div>
+
+<!-- Pestaña 3 -->
+<div class="panel" id="panel2" role="tabpanel">
+  <fieldset>
+    <label>Viento (m/s)<input type="number" id="a_viento" step="0.1"></label>
+    <label>Humedad (%)<input type="number" id="a_hr"></label>
+    <label>Temperatura (°C)<input type="number" id="a_temp" step="0.1"></label>
+    <label>Índice kp<input type="number" id="a_kp" step="0.1"></label>
+  </fieldset>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button class="btn back" onclick="prevTab()">Volver</button>
+    <button class="btn next" onclick="calcular()">Calcular</button>
+    <button class="btn back" onclick="resetForm()">Reiniciar evaluación</button>
+  </div>
+  <div id="status2" class="summary">Previo a la Aplicación (Ambiental): —</div>
+</div>
+
+<!-- Pestaña 4 Observaciones -->
+<div class="panel" id="panel3" role="tabpanel">
+  <h3>Observaciones</h3>
+  <div id="obsTexto">Aquí aparecerán las observaciones automáticas con Recomendaciones.</div>
+  <div style="margin-top:10px;">
+    <button id="btnExportObs" onclick="exportarObservaciones()" class="btn" style="background:#007bff;color:#fff;">⬇ Exportar diagnóstico (HTML)</button>
+    <button id="btnExportPDF" onclick="exportarPDF()" class="btn" style="background:#d9534f;color:#fff;margin-left:8px;">⬇ Exportar a PDF</button>
+    <button class="btn back" onclick="resetForm()" style="margin-left:8px;">Reiniciar evaluación</button>
+  </div>
+  <div class="export-note">Exportará solo los criterios cargados (se omiten campos vacíos). El PDF separa los criterios según la pestaña de origen.</div>
+</div>
+
+<h2>Resultado Global: <span id="res" class="result">—</span></h2>
+
+<div style="position:fixed; bottom:10px; right:20px; font-size:13px; color:#666;">Eraldo Bogado</div>
+
+<script>
+// Helpers
+function getVal(id){ const e=document.getElementById(id); return e? (e.value===undefined? '': String(e.value).trim()) : ''; }
+function toNumber(v){ if(v===null||v===undefined||v==='') return NaN; return parseFloat(String(v).replace(',', '.')); }
+
+// classification helpers
+function clasifNum(val, aptMin, aptMax, condMin, condMax, invert){
+  if(val===null || val===undefined || val==='') return '';
+  var num = parseFloat(String(val).replace(',', '.'));
+  if(isNaN(num)) return '';
+  if(!invert){
+    if((aptMin==null || num>=aptMin) && (aptMax==null || num<=aptMax)) return 'Apto';
+    if((condMin!=null && num>=condMin) && (condMax!=null && num<=condMax)) return 'Condicional';
+    return 'No Apto';
+  } else {
+    if(aptMax!=null && num<=aptMax) return 'Apto';
+    if(condMin!=null && condMax!=null && num>condMin && num<=condMax) return 'Condicional';
+    return 'No Apto';
+  }
+}
+function clasifCat(v,map){ if(!v) return ''; return map[v] || map[v.toLowerCase()] || ''; }
+
+function resumen(etiqueta, arr){
+  if(!arr || arr.length===0) return etiqueta + ': —';
+  if(arr.some(x=>x==='No Apto')) return etiqueta + ': No Apto';
+  if(arr.some(x=>x==='Condicional')) return etiqueta + ': Condicional';
+  if(arr.some(x=>x==='Apto')) return etiqueta + ': Apto';
+  return etiqueta + ': —';
+}
+
+// Updated recomendaciones map (from Sugerencias.docx). See file: Sugerencias.docx. fileciteturn1file0
+var recomendacionesMap = {
+  "Pendiente previo mapeo (%)": "Evaluar las maniobras de vuelo, considerando ajustes en trayectorias, altitud y velocidad. Planificar rutas horizontales en función de la pendiente del terreno.",
+  "Pendiente campo (%)": "Evaluar las maniobras de vuelo, considerando ajustes en trayectorias, altitud y velocidad. Planificar rutas horizontales en función de la pendiente del terreno.",
+  "Prox. aeródromos (m)": "Respetar la distancia mínima de zonas aéreas.",
+  "Prox. viviendas/escuelas (m)": "Verificar las normativas locales y conseguir los permisos requeridos. Monitorear la deriva. Cumplir con las distancias de seguridad establecidas.",
+  "Prox. viviendas/escuelas (m) campo": "Verificar las normativas locales y conseguir los permisos requeridos. Monitorear la deriva. Cumplir con las distancias de seguridad establecidas.",
+  "Prox. cuerpos de agua (m)": "Cumplir con las normativas locales y comprobar las distancias mínimas de seguridad. Ampliar el área de protección, emplear métodos para reducir la deriva. Evitar situaciones de viento fuerte.",
+  "Prox. cuerpos de agua (m) campo": "Cumplir con las normativas locales y comprobar las distancias mínimas de seguridad. Ampliar el área de protección, emplear métodos para reducir la deriva. Evitar situaciones de viento fuerte.",
+  "Disponibilidad logística (m)": "Optimizar ubicación y zonas de recarga cercanas. Ajustar rutas de vuelo. Dividir tareas. Usar estaciones de cargas portátiles.",
+  "Disponibilidad logística (m) campo": "Optimizar ubicación y zonas de recarga cercanas. Ajustar rutas de vuelo. Dividir tareas. Usar estaciones de cargas portátiles.",
+  "Índice Kp": "Posponer el vuelo por inestabilidad en la señal satelital; se recomienda esperar a que las condiciones mejoren.",
+  "Índice Kp ambiental": "Posponer el vuelo por inestabilidad en la señal satelital; se recomienda esperar a que las condiciones mejoren.",
+  "Accesibilidad": "Evaluar accesos alternativos y planificar rutas de entrada; considerar la adecuación de caminos.",
+  "Accesibilidad campo": "Evaluar accesos alternativos y planificar rutas de entrada; considerar la adecuación de caminos.",
+  "Áreas protegidas": "Adherirse a las regulaciones, comprobar las leyes locales y gestionar los permisos si es requerido. Evitar la aplicación en dichas zonas.",
+  "Áreas protegidas campo": "Adherirse a las regulaciones, comprobar las leyes locales y gestionar los permisos si es requerido. Evitar la aplicación en dichas zonas.",
+  "Obstáculos (desc)": "Detectar obstáculos y definir la ruta óptima. Evaluar el terreno y ajustar el plan de vuelo para evitar zonas de riesgo.",
+  "Cobertura obstáculos (%)": "Verificar el terreno y ajustar las rutas de vuelo para esquivar zonas críticas. Planificar operación por secciones para reducir riesgos.",
+  "Distribución obstáculos": "Verificar el terreno y ajustar las rutas de vuelo para esquivar zonas críticas. Planificar operación por secciones para reducir riesgos.",
+  "Cobertura GNSS": "Reprogramar el vuelo o considerar el uso de apoyo terrestre. Evaluar la viabilidad de estaciones base o la operación mediante vuelo manual asistido.",
+  "Viento (m/s)": "Esperar condiciones meteorológicas más favorables. Reprogramar la aplicación para horas de menor turbulencia (mañana o atardecer). Ajustar el tamaño de las gotas y la presión del equipo para reducir la deriva. Verificar la dirección del viento para evitar transporte hacia zonas sensibles.",
+  "Humedad relativa (%)": "Reprogramar la aplicación o ajustar las condiciones según los rangos operativos ideales. Si supera el rango óptimo: aumentar volumen de aplicación, incorporar aditivos antiespumantes, ajustar dosis y evitar periodos de alta humedad. Si está por debajo: usar formulaciones adecuadas, aumentar volumen, regular presión y caudal, y evitar horas de mayor temperatura.",
+  "Temperatura (°C)": "Ajustar según condiciones térmicas: si supera el rango recomendado, planificar la aplicación en la mañana temprano o la tarde, usar productos formulados para condiciones calurosas y ajustar el equipo para reducir evaporación. Si está por debajo, evitar pulverizar en frío, usar productos adecuados y esperar un aumento de temperatura o mover la aplicación a horas más frescas.",
+};
+
+// partial summaries
+function calcPartial(){
+  try{
+    var p = [
+      clasifNum(getVal('p_pend'), null, 8, 8, 15, true),
+      clasifNum(getVal('p_aero'), 5000, null, null, null),
+      clasifNum(getVal('p_viv'), 200, null, 100, 200),
+      clasifNum(getVal('p_agua'), 100, null, 50, 100),
+      clasifNum(getVal('p_log'), null, 1000, 1000, 5000, true),
+      clasifNum(getVal('p_kp'), null, 4, 4, 5, true),
+      clasifCat(getVal('p_acc'), {'directo':'Apto','parcial':'Condicional','sin':'No Apto'}),
+      clasifCat(getVal('p_ap'), {'ausente':'Apto','limite':'Condicional','dentro':'No Apto'})
+    ];
+    document.getElementById('status0').textContent = resumen('Previo al Mapeo', p);
+
+    var m = [
+      clasifNum(getVal('m_pend'), null, 8, 8, 15, true),
+      clasifCat(getVal('m_acc'), {'directo':'Apto','parcial':'Condicional','sin':'No Apto'}),
+      clasifNum(getVal('m_viv'), 200, null, 100, 200),
+      clasifNum(getVal('m_agua'), 100, null, 50, 100),
+      clasifNum(getVal('m_log'), null, 1000, 1000, 5000, true),
+      clasifCat(getVal('m_obsdesc'), {'ausentes':'Apto','moderados':'Condicional','densos':'No Apto'}),
+      clasifNum(getVal('m_obs'), null, 10, 10, 40, true),
+      clasifCat(getVal('m_obsdist'), {'extremos':'Apto','centro':'Condicional','toda':'No Apto'}),
+      clasifCat(getVal('m_gnss'), {'fuerte':'Apto','intermitente':'Condicional','nula':'No Apto'}),
+      clasifCat(getVal('m_ap'), {'ausente':'Apto','limite':'Condicional','dentro':'No Apto'})
+    ];
+    document.getElementById('status1').textContent = resumen('Mapeo y Campo', m);
+
+    var a = [
+      clasifNum(getVal('a_viento'), null, 3, 3, 5, true),
+      clasifNum(getVal('a_hr'), 50, 80, 30, 50),
+      clasifNum(getVal('a_temp'), 15, 28, 28, 32),
+      clasifNum(getVal('a_kp'), null, 4, 4, 5, true)
+    ];
+    document.getElementById('status2').textContent = resumen('Previo a la Aplicación (Ambiental)', a);
+  }catch(e){
+    console.error('calcPartial error', e);
+  }
+}
+
+// Tabs
+var currentTab = 0;
+function showTab(n){
+  var tabs = document.querySelectorAll('.tab');
+  var panels = document.querySelectorAll('.panel');
+  if(n<0) n=0; if(n>panels.length-1) n=panels.length-1;
+  tabs.forEach(function(t,i){ t.classList.toggle('active', i===n); });
+  panels.forEach(function(p,i){ p.classList.toggle('active', i===n); });
+  currentTab = n;
+}
+function nextTab(){ try{ calcPartial(); }catch(e){} if(currentTab < document.querySelectorAll('.panel').length-1) showTab(currentTab+1); }
+function prevTab(){ if(currentTab>0) showTab(currentTab-1); }
+
+// collect criteria (no 'mitigacion' field - single Recomendación comes from recomendacionesMap)
+function collectAllCriteria(){
+  var prev = [], map = [], amb = [];
+  function add(list,label,id,clasifier,rango){
+    var val = getVal(id);
+    if(val === null || val === undefined || val === '') return;
+    var clas = typeof clasifier === 'function' ? clasifier() : clasifier;
+    list.push({variable: label, valor: val, clasif: (clas||''), rango: rango||'—'});
+  }
+
+  // Previos
+  add(prev, 'Pendiente previo mapeo (%)','p_pend', function(){ return clasifNum(getVal('p_pend'), null,8,8,15,true); }, '≤8% apto, 8–15% condicional, >15% no apto');
+  add(prev, 'Prox. aeródromos (m)','p_aero', function(){ return clasifNum(getVal('p_aero'),5000,null,null,null); }, '≥5000m apto, <5000 no apto');
+  add(prev, 'Prox. viviendas/escuelas (m)','p_viv', function(){ return clasifNum(getVal('p_viv'),200,null,100,200); }, '≥200m apto, 100–200 condicional, <100 no apto');
+  add(prev, 'Prox. cuerpos de agua (m)','p_agua', function(){ return clasifNum(getVal('p_agua'),100,null,50,100); }, '≥100m apto, 50–100 condicional, <50 no apto');
+  add(prev, 'Disponibilidad logística (m)','p_log', function(){ return clasifNum(getVal('p_log'), null,1000,1000,5000,true); }, '≤1000m apto, 1000–5000 condicional, >5000 no apto');
+  add(prev, 'Índice Kp','p_kp', function(){ return clasifNum(getVal('p_kp'), null,4,4,5,true); }, '≤4 apto, 4–5 condicional, >5 no apto');
+  add(prev, 'Accesibilidad','p_acc', function(){ return clasifCat(getVal('p_acc'), {'directo':'Apto','parcial':'Condicional','sin':'No Apto'}); }, 'Acceso directo apto, parcial condicional, sin acceso no apto');
+  add(prev, 'Áreas protegidas','p_ap', function(){ return clasifCat(getVal('p_ap'), {'ausente':'Apto','limite':'Condicional','dentro':'No Apto'}); }, 'Ausentes apto, ≥200m condicional, dentro no apto');
+
+  // Mapeo y campo
+  add(map, 'Pendiente campo (%)','m_pend', function(){ return clasifNum(getVal('m_pend'), null,8,8,15,true); }, '≤8% apto, 8–15% condicional, >15% no apto');
+  add(map, 'Obstáculos (desc)','m_obsdesc', function(){ return clasifCat(getVal('m_obsdesc'), {'ausentes':'Apto','moderados':'Condicional','densos':'No Apto'}); }, 'Ausentes apto, moderados condicional, densos no apto');
+  add(map, 'Accesibilidad campo','m_acc', function(){ return clasifCat(getVal('m_acc'), {'directo':'Apto','parcial':'Condicional','sin':'No Apto'}); }, 'Acceso directo apto, parcial condicional, sin acceso no apto');
+  add(map, 'Prox. viviendas/escuelas (m) campo','m_viv', function(){ return clasifNum(getVal('m_viv'),200,null,100,200); }, '≥200m apto, 100–200 condicional, <100 no apto');
+  add(map, 'Prox. cuerpos de agua (m) campo','m_agua', function(){ return clasifNum(getVal('m_agua'),100,null,50,100); }, '≥100m apto, 50–100 condicional, <50 no apto');
+  add(map, 'Disponibilidad logística (m) campo','m_log', function(){ return clasifNum(getVal('m_log'), null,1000,1000,5000,true); }, '≤1000m apto, 1000–5000 condicional, >5000 no apto');
+  add(map, 'Cobertura obstáculos (%)','m_obs', function(){ return clasifNum(getVal('m_obs'), null,10,10,40,true); }, '≤10% apto, 10–40 condicional, >40 no apto');
+  add(map, 'Distribución obstáculos','m_obsdist', function(){ return clasifCat(getVal('m_obsdist'), {'extremos':'Apto','centro':'Condicional','toda':'No Apto'}); }, 'Extremos apto, centros condicional, toda el área no apto');
+  add(map, 'Cobertura GNSS','m_gnss', function(){ return clasifCat(getVal('m_gnss'), {'fuerte':'Apto','intermitente':'Condicional','nula':'No Apto'}); }, 'Fuerte apto, intermitente condicional, nula no apto');
+  add(map, 'Áreas protegidas campo','m_ap', function(){ return clasifCat(getVal('m_ap'), {'ausente':'Apto','limite':'Condicional','dentro':'No Apto'}); }, 'Ausentes apto, ≥200m condicional, dentro no apto');
+
+  // Ambiental
+  add(amb, 'Viento (m/s)','a_viento', function(){ return clasifNum(getVal('a_viento'), null,3,3,5,true); }, '≤3 m/s apto, 3–5 condicional, >5 no apto');
+  add(amb, 'Humedad relativa (%)','a_hr', function(){ return clasifNum(getVal('a_hr'),50,80,30,50); }, '50–80% apto, 30–50 condicional, fuera no apto');
+  add(amb, 'Temperatura (°C)','a_temp', function(){ return clasifNum(getVal('a_temp'),15,28,28,32); }, '15–28°C apto, 28–32 condicional, fuera no apto');
+  add(amb, 'Índice Kp ambiental','a_kp', function(){ return clasifNum(getVal('a_kp'), null,4,4,5,true); }, '≤4 apto, 4–5 condicional, >5 no apto');
+
+  return {prev: prev, map: map, amb: amb};
+}
+
+// mostrar observaciones: ahora sólo muestra la sección "Recomendación" (antes Sugerencia)
+function mostrarObservaciones(){
+  var obs = document.getElementById('obsTexto'); if(!obs) return;
+  var lote = getVal('p_lote') || '—';
+  var fecha = getVal('p_fecha') || '—';
+  var ubic = getVal('p_ubic') || '—';
+  var sup = getVal('p_sup') || '—';
+  var grouped = collectAllCriteria();
+
+  var html = '';
+  html += '<div class="obs-datos">';
+  html += '<p><strong>Lote / Productor:</strong> ' + lote + '</p>';
+  html += '<p><strong>Fecha (dd/mm/aa):</strong> ' + fecha + '</p>';
+  html += '<p><strong>Ubicación (Coordenadas):</strong> ' + ubic + '</p>';
+  html += '<p><strong>Superficie (ha):</strong> ' + sup + '</p>';
+  html += '</div>';
+
+  html += '<div class="obs-legend"><span class="badge apto">✔ Apto</span><span class="badge cond">⚠ Condicional</span><span class="badge noap">✖ No Apto</span></div>';
+
+  if((grouped.prev.length + grouped.map.length + grouped.amb.length) === 0){
+    html += '<ul class="obs-list"><li class="apto"><span class="badge apto">✔</span> Sin observaciones: no se cargaron criterios.</li></ul>';
+    obs.innerHTML = html; return;
+  }
+
+  function renderSection(title, items){
+    if(!items || items.length===0) return '';
+    var s = '<h4 style="margin-bottom:6px;margin-top:12px;">' + title + '</h4>';
+    s += '<ul class="obs-list">';
+    items.forEach(function(c){
+      var icon = (c.clasif==='Apto')? '✔' : (c.clasif==='Condicional')? '⚠' : '✖';
+      var cls = (c.clasif==='Apto')? 'apto' : (c.clasif==='Condicional')? 'cond' : 'noap';
+      s += '<li class="' + cls + '">';
+      s += '<span class="badge ' + cls + '">' + icon + '</span>';
+      s += '<span class="obs-title">' + (c.variable || '—') + '</span>';
+      s += ' — <em>' + (c.valor || '—') + '</em>';
+      // Only show Recomendación (new requirement) when Condicional or No Apto
+      if(c.clasif !== 'Apto'){
+        var reco = recomendacionesMap[c.variable] || '—';
+        s += '<div class="obs-reco"><strong>Recomendación:</strong> ' + reco + '</div>';
+      }
+      s += '</li>';
+    });
+    s += '</ul>'; return s;
+  }
+
+  html += renderSection('1. Previo al Mapeo', grouped.prev);
+  html += renderSection('2. Mapeo y Campo', grouped.map);
+  html += renderSection('3. Previo a la Aplicación (Ambiental)', grouped.amb);
+
+  obs.innerHTML = html;
+}
+
+// Reset
+function resetForm(){
+  var inputs = document.querySelectorAll('input, select, textarea');
+  inputs.forEach(function(el){
+    if(el.tagName.toLowerCase()==='select') el.selectedIndex = 0;
+    else el.value = '';
+  });
+  document.getElementById('res').innerHTML = '—';
+  document.getElementById('res').className = 'result';
+  document.getElementById('obsTexto').innerHTML = 'Aquí aparecerán las observaciones automáticas con Recomendaciones.';
+  showTab(0);
+  try{ calcPartial(); }catch(e){}
+}
+
+// calcular
+function calcular(){
+  try{ calcPartial(); }catch(e){}
+  var p = [
+    clasifNum(getVal('p_pend'), null, 8, 8, 15, true),
+    clasifNum(getVal('p_aero'), 5000, null, null, null),
+    clasifNum(getVal('p_viv'), 200, null, 100, 200),
+    clasifNum(getVal('p_agua'), 100, null, 50, 100),
+    clasifNum(getVal('p_log'), null, 1000, 1000, 5000, true),
+    clasifNum(getVal('p_kp'), null, 4, 4, 5, true),
+    clasifCat(getVal('p_acc'), {'directo':'Apto','parcial':'Condicional','sin':'No Apto'}),
+    clasifCat(getVal('p_ap'), {'ausente':'Apto','limite':'Condicional','dentro':'No Apto'})
+  ];
+  var m = [
+    clasifNum(getVal('m_pend'), null, 8, 8, 15, true),
+    clasifCat(getVal('m_acc'), {'directo':'Apto','parcial':'Condicional','sin':'No Apto'}),
+    clasifNum(getVal('m_viv'), 200, null, 100, 200),
+    clasifNum(getVal('m_agua'), 100, null, 50, 100),
+    clasifNum(getVal('m_log'), null, 1000, 1000, 5000, true),
+    clasifCat(getVal('m_obsdesc'), {'ausentes':'Apto','moderados':'Condicional','densos':'No Apto'}),
+    clasifNum(getVal('m_obs'), null, 10, 10, 40, true),
+    clasifCat(getVal('m_obsdist'), {'extremos':'Apto','centro':'Condicional','toda':'No Apto'}),
+    clasifCat(getVal('m_gnss'), {'fuerte':'Apto','intermitente':'Condicional','nula':'No Apto'}),
+    clasifCat(getVal('m_ap'), {'ausente':'Apto','limite':'Condicional','dentro':'No Apto'})
+  ];
+  var a = [
+    clasifNum(getVal('a_viento'), null, 3, 3, 5, true),
+    clasifNum(getVal('a_hr'), 50, 80, 30, 50),
+    clasifNum(getVal('a_temp'), 15, 28, 28, 32),
+    clasifNum(getVal('a_kp'), null, 4, 4, 5, true)
+  ];
+  var allVals = p.concat(m).concat(a).filter(function(x){ return x && x!==''; });
+  var total = allVals.length || 1;
+  var aptCount = allVals.filter(function(x){ return x==='Apto'; }).length;
+  var condCount = allVals.filter(function(x){ return x==='Condicional'; }).length;
+  var noCount = allVals.filter(function(x){ return x==='No Apto'; }).length;
+  var aptPct = Math.round((aptCount/total)*100);
+  var condPct = Math.round((condCount/total)*100);
+  var noPct = 100 - aptPct - condPct;
+  var final = 'Apto';
+  if(allVals.some(function(x){ return x==='No Apto'; })) final = 'No Apto';
+  else if(allVals.some(function(x){ return x==='Condicional'; })) final = 'Condicional';
+  var el = document.getElementById('res');
+  el.innerHTML = '<span class="badge apto">✔ Apto ' + aptPct + '%</span> <span class="badge cond">⚠ Cond ' + condPct + '%</span> <span class="badge noap">✖ No Apto ' + noPct + '%</span><div style="margin-top:6px;font-weight:700">Clasificación final: ' + final + '</div>';
+  el.className = 'result ' + (final==='Apto'?'apto': final==='Condicional'?'cond':'noap');
+
+  // show observations
+  mostrarObservaciones();
+  showTab(3);
+}
+
+// Build grouped summary (single Recomendación column)
+function buildSummaryTableGrouped(){
+  var groups = collectAllCriteria();
+  function buildSectionHTML(title, items){
+    if(!items || items.length===0) return '';
+    var s = '<div class="section"><h3 style="margin:10px 0 6px;">' + title + '</h3>';
+    s += '<table class="summary-table"><thead><tr><th style="background:#f5f5f5;">Criterio</th><th style="background:#f5f5f5;">Valor</th><th style="background:#f5f5f5;">Clasificación</th><th style="background:#f5f5f5;">Recomendación</th></tr></thead><tbody>';
+    items.forEach(function(it){
+      var badgeClass = it.clasif==='Apto'?'apto': it.clasif==='Condicional'?'cond':'noap';
+      var badgeSymbol = it.clasif==='Apto'?'✔': it.clasif==='Condicional'?'⚠':'✖';
+      var badgeColor = badgeClass==='apto'? '#C6EFCE' : badgeClass==='cond'? '#FFEB9C' : '#FFC7CE';
+      var textColor = badgeClass==='apto'? '#0b6623' : badgeClass==='cond'? '#8a5600' : '#8a0b0b';
+      var reco = recomendacionesMap[it.variable] || '';
+      s += '<tr>';
+      s += '<td>' + (it.variable || '—') + '</td>';
+      s += '<td>' + (it.valor || '—') + '</td>';
+      s += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:6px;font-weight:700;background:' + badgeColor + ';color:' + textColor + ';">' + badgeSymbol + ' ' + (it.clasif||'—') + '</span></td>';
+      s += '<td>' + ((it.clasif && it.clasif!=='Apto') ? (reco || '—') : '—') + '</td>';
+      s += '</tr>';
+    });
+    s += '</tbody></table>';
+    s += '</div>';
+    return s;
+  }
+  var html = '';
+  html += buildSectionHTML('1. Previo al Mapeo', groups.prev);
+  html += buildSectionHTML('2. Mapeo y Campo', groups.map);
+  html += buildSectionHTML('3. Previo a la Aplicación (Ambiental)', groups.amb);
+  if(html==='') html = '<p>No hay criterios cargados para exportar.</p>';
+  return html;
+}
+
+// export to HTML
+function exportarObservaciones(){
+  try{
+    var groupedHtml = buildSummaryTableGrouped();
+    var estilos = '<style>' +
+      'body{font-family:system-ui, -apple-system, \"Segoe UI\", Roboto, Arial, sans-serif;padding:16px;background:#fff;color:#111;}' +
+      '.badge{display:inline-block;padding:4px 8px;border-radius:6px;font-weight:700;margin-right:8px;}' +
+      '.badge.apto{background:#C6EFCE;color:#0b6623;}.badge.cond{background:#FFEB9C;color:#8a5600;}.badge.noap{background:#FFC7CE;color:#8a0b0b;}' +
+      'table.summary-table{width:100%;border-collapse:collapse;margin-bottom:12px;}table.summary-table th,table.summary-table td{padding:6px;border:1px solid #ddd;text-align:left;}' +
+      '.obs-datos{margin-bottom:12px;padding:8px;background:#f0f8ff;border-radius:6px;border:1px solid #cce5ff;}' +
+      '</style>';
+    var lote = getVal('p_lote') || '—';
+    var fecha = getVal('p_fecha') || '—';
+    var ubic = getVal('p_ubic') || '—';
+    var sup = getVal('p_sup') || '—';
+    var title = '<h2>Informe de factibilidad de aplicación con drones – Provincia de Misiones</h2>';
+    var headerInfo = '<div class="obs-datos"><p><strong>Lote / Productor:</strong> ' + lote + '</p><p><strong>Fecha:</strong> ' + fecha + '</p><p><strong>Ubicación:</strong> ' + ubic + '</p><p><strong>Superficie (ha):</strong> ' + sup + '</p></div>';
+    var html = '<!doctype html><html><head><meta charset=\"utf-8\">' + estilos + '</head><body>' + title + headerInfo + groupedHtml + '<div style="margin-top:12px;text-align:right;font-weight:700">Eraldo Bogado</div></body></html>';
+    var blob = new Blob([html], {type: 'text/html'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'diagnostico_drones_recomendaciones.html';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+  }catch(err){
+    console.error('Error exportarObservaciones', err);
+    alert('Error al exportar HTML: ' + err);
+  }
+}
+
+// export to PDF
+function exportarPDF(){
+  var groupedHtml = buildSummaryTableGrouped();
+  var container = document.createElement('div');
+  container.style.width = '794px'; // approx A4 @96dpi
+  container.style.padding = '16px';
+  container.style.background = '#fff';
+  container.style.color = '#111';
+  container.style.boxSizing = 'border-box';
+  container.style.fontFamily = 'system-ui, -apple-system, \"Segoe UI\", Roboto, Arial, sans-serif';
+
+  var header = document.createElement('div');
+  header.innerHTML = '<h2 style="margin:0 0 6px;">Informe de factibilidad de aplicación con drones – Provincia de Misiones</h2>';
+  container.appendChild(header);
+
+  var lote = getVal('p_lote') || '—';
+  var fecha = getVal('p_fecha') || '—';
+  var ubic = getVal('p_ubic') || '—';
+  var sup = getVal('p_sup') || '—';
+  var headerInfo = document.createElement('div');
+  headerInfo.className = 'obs-datos';
+  headerInfo.innerHTML = '<p><strong>Lote / Productor:</strong> ' + lote + '</p><p><strong>Fecha:</strong> ' + fecha + '</p><p><strong>Ubicación:</strong> ' + ubic + '</p><p><strong>Superficie (ha):</strong> ' + sup + '</p>';
+  container.appendChild(headerInfo);
+
+  var res = document.getElementById('res').cloneNode(true);
+  res.style.marginBottom = '8px';
+  container.appendChild(res);
+
+  var wrapper = document.createElement('div');
+  wrapper.innerHTML = groupedHtml;
+  container.appendChild(wrapper);
+
+  var footer = document.createElement('div');
+  footer.style.marginTop = '12px';
+  footer.style.textAlign = 'right';
+  footer.innerHTML = '<div style=\"font-weight:700\">Eraldo Bogado</div>';
+  container.appendChild(footer);
+
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  document.body.appendChild(container);
+
+  html2canvas(container, {scale:2, useCORS:true, backgroundColor:'#ffffff'}).then(function(canvas){
+    document.body.removeChild(container);
+    var imgData = canvas.toDataURL('image/png');
+    var jspdf = window.jspdf;
+    var jsPDF = jspdf && jspdf.jsPDF ? jspdf.jsPDF : null;
+    if(!jsPDF){
+      alert('No se pudo cargar jsPDF en este navegador.');
+      return;
+    }
+    var pdf = new jsPDF('p','mm','a4');
+    var pageWidth = pdf.internal.pageSize.getWidth();
+    var pageHeight = pdf.internal.pageSize.getHeight();
+    var imgProps = pdf.getImageProperties(imgData);
+    var pdfImgWidth = pageWidth - 20;
+    var ratio = imgProps.width / pdfImgWidth;
+    var pdfImgHeight = imgProps.height / ratio;
+    var canvasWidth = canvas.width;
+    var canvasHeight = canvas.height;
+    var pagePxHeight = Math.floor(canvasWidth * pageHeight / pageWidth);
+    var position = 0;
+    while(position < canvasHeight){
+      var pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvasWidth;
+      pageCanvas.height = Math.min(pagePxHeight, canvasHeight - position);
+      var ctx = pageCanvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0,0,pageCanvas.width,pageCanvas.height);
+      ctx.drawImage(canvas, 0, position, canvasWidth, pageCanvas.height, 0, 0, canvasWidth, pageCanvas.height);
+      var pageImg = pageCanvas.toDataURL('image/png');
+      var imgProps2 = pdf.getImageProperties(pageImg);
+      var h = (imgProps2.height * pdfImgWidth) / imgProps2.width;
+      pdf.addImage(pageImg, 'PNG', 10, 10, pdfImgWidth, h);
+      position += pagePxHeight;
+      if(position < canvasHeight) pdf.addPage();
+    }
+    pdf.save('diagnostico_drones_recomendaciones.pdf');
+  }).catch(function(err){
+    console.error('html2canvas error', err);
+    alert('Error al generar el PDF: ' + err);
+  });
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function(){
+  showTab(0);
+  var inputs = document.querySelectorAll('input, select, textarea');
+  inputs.forEach(function(el){ el.addEventListener('input', calcPartial); el.addEventListener('change', calcPartial); });
+  try{ calcPartial(); }catch(e){ console.error(e); }
+});
+</script>
+
+</body>
+</html>
